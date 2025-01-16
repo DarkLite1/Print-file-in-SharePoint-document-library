@@ -107,7 +107,7 @@ Write-Verbose "Most recent file '$($mostRecentFile.Name)'"
 #endregion
 
 #region Download file
-$downloadFilePath = "{0}\{1}" -f $env:TEMP, $mostRecentFile.Name
+$downloadFilePath = '{0}\{1}' -f $env:TEMP, $mostRecentFile.Name
 
 $params = @{
     DriveId     = $DriveId
