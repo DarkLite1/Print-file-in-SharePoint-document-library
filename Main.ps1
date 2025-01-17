@@ -23,6 +23,7 @@
         Get-MgDriveItem -DriveId $DriveId -DriveItemId $driveRootChildren.id
 #>
 
+[CmdLetBinding()]
 Param (
     [String]$SiteId = 'hcgroupnet.sharepoint.com,b4c482ba-d46d-4a40-93f1-463b40faacd4,213a6ffc-1009-43ca-be81-d20b54789765',
     [String]$DriveId = 'b!uoLEtG3UQEqT8UY7QPqs1PxvOiEJEMpDvoHSC1R4l2W5o0sx337DTZPZGtpfnBvg',
