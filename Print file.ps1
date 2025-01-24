@@ -1,4 +1,8 @@
-﻿<#
+﻿#Requires -Version 7
+#Requires -Modules Microsoft.Graph
+#Requires -Modules Toolbox.FileAndFolder
+
+<#
     .SYNOPSIS
         Print a file in the SharePoint document library
 
@@ -28,12 +32,18 @@ Param (
     [String]$SiteId = 'hcgroupnet.sharepoint.com,b4c482ba-d46d-4a40-93f1-463b40faacd4,213a6ffc-1009-43ca-be81-d20b54789765',
     [String]$DriveId = 'b!uoLEtG3UQEqT8UY7QPqs1PxvOiEJEMpDvoHSC1R4l2W5o0sx337DTZPZGtpfnBvg',
     [String]$FolderId = '01P4GU2YRPPOUAAVJA6ZC2IZMNPRNCVPFI',
-    [String]$PrinterName = '\\belsflixh0001\BELPRLIXH609'
+    [String]$PrinterName = 'BELPRBRAN603',
+    [Int]$PrinterPort = 9100
 
 )
 
+Start-Transcript -Path "T:\Test\Brecht\PowerShell\Print file in SharePoint document library\Transcript.txt" -Append -UseMinimalHeader
+
 $ErrorActionPreference = 'Stop'
 $VerbosePreference = 'Continue'
+
+Write-Verbose 'Install printer'
+Add-Printer -ConnectionName $PrinterName
 
 #region Connect to Microsoft Graph
 Write-Verbose 'Connect to MS Graph'
@@ -127,8 +137,11 @@ Get-MgDriveItemContent @params
 Write-Verbose "Print file on printer '$PrinterName'"
 
 $params = @{
-    FilePath    = $downloadFilePath
-    PrinterName = $PrinterName
+    FilePath                     = $downloadFilePath
+    PrinterName                  = $PrinterName
+    PrinterPort                  = $PrinterPort
 }
-Out-PrintPdfFileHC @params
+Out-PrintFileHC @params
 #endregion
+
+Stop-Transcript
