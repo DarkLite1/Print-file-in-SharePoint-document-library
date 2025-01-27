@@ -1,5 +1,4 @@
 ﻿#Requires -Version 7
-#Requires -Modules Microsoft.Graph
 #Requires -Modules Toolbox.FileAndFolder
 
 <#
