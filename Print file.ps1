@@ -36,10 +36,7 @@ Param (
 
 )
 
-Start-Transcript -Path "T:\Test\Brecht\PowerShell\Print file in SharePoint document library\Transcript.txt" -Append -UseMinimalHeader
-
 $ErrorActionPreference = 'Stop'
-$VerbosePreference = 'Continue'
 
 #region Connect to Microsoft Graph
 Write-Verbose 'Connect to MS Graph'
@@ -139,5 +136,3 @@ $params = @{
 }
 Out-PrintFileHC @params
 #endregion
-
-Stop-Transcript
