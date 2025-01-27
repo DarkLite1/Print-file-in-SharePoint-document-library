@@ -359,7 +359,7 @@ Describe 'ExportExcelFile.When' {
         It "'OnlyOnError' and no errors are found" {
             $testNewDate = Copy-ObjectHC $testData
             $testNewDate.Printed = $true
-            $testNewDate.Errors = $null
+            $testNewDate.Error = $null
 
             Mock Invoke-PrintFileScriptHC {
                 $testNewDate
@@ -379,7 +379,7 @@ Describe 'ExportExcelFile.When' {
         It "'OnlyOnErrorOrAction' and there are no errors and no actions" {
             $testNewDate = Copy-ObjectHC $testData
             $testNewDate.Printed = $false
-            $testNewDate.Errors = $null
+            $testNewDate.Error = $null
 
             Mock Invoke-PrintFileScriptHC {
                 $testNewDate
@@ -399,15 +399,12 @@ Describe 'ExportExcelFile.When' {
     }
     Context 'create an Excel file' {
         It "'OnlyOnError' and there are errors" {
-            Mock Invoke-Command {
-                [PSCustomObject]@{
-                    Path     = 'a'
-                    DateTime = Get-Date
-                    Action   = @()
-                    Error    = 'oops'
-                }
-            } -ParameterFilter {
-                $FilePath -eq $testParams.ScriptPath.PrintFile
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $false
+            $testNewDate.Error = 'oops'
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
             }
 
             $testNewInputFile = Copy-ObjectHC $testInputFile
@@ -422,16 +419,12 @@ Describe 'ExportExcelFile.When' {
             Should -Not -BeNullOrEmpty
         }
         It "'OnlyOnErrorOrAction' and there are actions but no errors" {
-            Mock Invoke-Command {
-                [PSCustomObject]@{
-                    Path     = 'a'
-                    DateTime = Get-Date
-                    Uploaded = $true
-                    Action   = @('upload')
-                    Error    = $null
-                }
-            } -ParameterFilter {
-                $FilePath -eq $testParams.ScriptPath.PrintFile
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $true
+            $testNewDate.Error = $null
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
             }
 
             $testNewInputFile = Copy-ObjectHC $testInputFile
@@ -446,16 +439,12 @@ Describe 'ExportExcelFile.When' {
             Should -Not -BeNullOrEmpty
         }
         It "'OnlyOnErrorOrAction' and there are errors but no actions" {
-            Mock Invoke-Command {
-                [PSCustomObject]@{
-                    Path     = 'a'
-                    Uploaded = $false
-                    DateTime = Get-Date
-                    Action   = @()
-                    Error    = 'oops'
-                }
-            } -ParameterFilter {
-                $FilePath -eq $testParams.ScriptPath.PrintFile
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $false
+            $testNewDate.Error = 'oops'
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
             }
 
             $testNewInputFile = Copy-ObjectHC $testInputFile
@@ -469,7 +458,7 @@ Describe 'ExportExcelFile.When' {
             Get-ChildItem $testParams.LogFolder -File -Recurse -Filter '*.xlsx' |
             Should -Not -BeNullOrEmpty
         }
-    } -Tag test
+    }
 }
 Describe 'SendMail.When' {
     BeforeAll {
@@ -501,9 +490,12 @@ Describe 'SendMail.When' {
             Should -Not -Invoke Send-MailHC
         }
         It "'OnlyOnErrorOrAction' and there are no errors and no actions" {
-            Mock Invoke-Command {
-            } -ParameterFilter {
-                $FilePath -eq $testParams.ScriptPath.PrintFile
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $false
+            $testNewDate.Error = $null
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
             }
 
             $testNewInputFile = Copy-ObjectHC $testInputFile
@@ -519,15 +511,12 @@ Describe 'SendMail.When' {
     }
     Context 'send an e-mail to the user' {
         It "'OnlyOnError' and there are errors" {
-            Mock Invoke-Command {
-                [PSCustomObject]@{
-                    Path     = 'a'
-                    DateTime = Get-Date
-                    Action   = @()
-                    Error    = 'oops'
-                }
-            } -ParameterFilter {
-                $FilePath -eq $testParams.ScriptPath.PrintFile
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $false
+            $testNewDate.Error = 'oops'
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
             }
 
             $testNewInputFile = Copy-ObjectHC $testInputFile
@@ -541,16 +530,12 @@ Describe 'SendMail.When' {
             Should -Invoke Send-MailHC @testParamFilter
         }
         It "'OnlyOnErrorOrAction' and there are actions but no errors" {
-            Mock Invoke-Command {
-                [PSCustomObject]@{
-                    Path     = 'a'
-                    DateTime = Get-Date
-                    Uploaded = $true
-                    Action   = @('upload')
-                    Error    = $null
-                }
-            } -ParameterFilter {
-                $FilePath -eq $testParams.ScriptPath.PrintFile
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $true
+            $testNewDate.Error = $null
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
             }
 
             $testNewInputFile = Copy-ObjectHC $testInputFile
@@ -564,15 +549,12 @@ Describe 'SendMail.When' {
             Should -Invoke Send-MailHC @testParamFilter
         }
         It "'OnlyOnErrorOrAction' and there are errors but no actions" {
-            Mock Invoke-Command {
-                [PSCustomObject]@{
-                    Path     = 'a'
-                    DateTime = Get-Date
-                    Action   = @()
-                    Error    = 'oops'
-                }
-            } -ParameterFilter {
-                $FilePath -eq $testParams.ScriptPath.PrintFile
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $false
+            $testNewDate.Error = 'oops'
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
             }
 
             $testNewInputFile = Copy-ObjectHC $testInputFile
@@ -586,4 +568,4 @@ Describe 'SendMail.When' {
             Should -Invoke Send-MailHC @testParamFilter
         }
     }
-}
+ } -Tag test
