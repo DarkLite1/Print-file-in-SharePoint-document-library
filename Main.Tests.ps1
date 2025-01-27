@@ -118,6 +118,44 @@ Describe 'send an e-mail to the admin when' {
                     $EntryType -eq 'Error'
                 }
             }
+            It 'SharePoint.<_> not found' -ForEach @(
+                'SiteId', 'DriveId', 'FolderId'
+            ) {
+                $testNewInputFile = Copy-ObjectHC $testInputFile
+                $testNewInputFile.SharePoint.$_ = $null
+
+                $testNewInputFile | ConvertTo-Json -Depth 7 |
+                Out-File @testOutParams
+
+                .$testScript @testParams
+
+                Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
+                        (&$MailAdminParams) -and
+                        ($Message -like "*$ImportFile*Property 'SharePoint.$_' not found*")
+                }
+                Should -Invoke Write-EventLog -Exactly 1 -ParameterFilter {
+                    $EntryType -eq 'Error'
+                }
+            }
+            It 'Printer.<_> not found' -ForEach @(
+                'Name', 'Port'
+            ) {
+                $testNewInputFile = Copy-ObjectHC $testInputFile
+                $testNewInputFile.Printer.$_ = $null
+
+                $testNewInputFile | ConvertTo-Json -Depth 7 |
+                Out-File @testOutParams
+
+                .$testScript @testParams
+
+                Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
+                        (&$MailAdminParams) -and
+                        ($Message -like "*$ImportFile*Property 'Printer.$_' not found*")
+                }
+                Should -Invoke Write-EventLog -Exactly 1 -ParameterFilter {
+                    $EntryType -eq 'Error'
+                }
+            }
             It 'SendMail.<_> not found' -ForEach @(
                 'To', 'When'
             ) {
@@ -192,7 +230,7 @@ Describe 'send an e-mail to the admin when' {
             }
         }
     }
-}
+} -Tag test
 Describe 'correct the import file' {
     Context "add trailing slashes to Paths starting with 'sftp:/'" {
         It 'Source' {
