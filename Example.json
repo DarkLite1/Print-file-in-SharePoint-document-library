@@ -1,0 +1,18 @@
+{
+  "SendMail": {
+    "To": ["brecht.gijbels@heidelbergmaterials.com"],
+    "When": "Always"
+  },
+  "SharePoint": {
+    "SiteId": "hcgroupnet.sharepoint.com,b4c482ba-d46d-4a40-93f1-463b40faacd4,213a6ffc-1009-43ca-be81-d20b54789765",
+    "DriveId": "b!uoLEtG3UQEqT8UY7QPqs1PxvOiEJEMpDvoHSC1R4l2W5o0sx337DTZPZGtpfnBvg",
+    "FolderId": "01P4GU2YRPPOUAAVJA6ZC2IZMNPRNCVPFI"
+  },
+  "Printer": {
+    "Name": "BELPRBRAN603",
+    "Port": 9100
+  },
+  "?": {
+    "SendMail.When": "Never | OnlyOnError | OnlyOnErrorOrAction | Always"
+  }
+}
