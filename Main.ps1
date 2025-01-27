@@ -217,7 +217,6 @@ Begin {
         Write-EventLog @EventEndParams; Exit 1
     }
 }
-
 Process {
     Try {
         #region Run Print file script
@@ -241,7 +240,6 @@ Process {
         Write-EventLog @EventEndParams; Exit 1
     }
 }
-
 End {
     try {
         #region Counter
@@ -332,6 +330,85 @@ End {
             $exportToExcel | Export-Excel @excelParams
 
             $mailParams.Attachments = $excelParams.Path
+        }
+        #endregion
+
+        #region Mail subject and priority
+        $mailParams += @{
+            Priority = 'Normal'
+            Subject  = @("$($counter.FilesPrinted) moved")
+        }
+
+        if ($counter.Errors) {
+            $mailParams.Priority = 'High'
+            $mailParams.Subject += "{0} error{1}" -f
+            $counter.Errors,
+            $(if ($counter.Errors -ne 1) { 's' })
+        }
+
+        $mailParams.Subject = $mailParams.Subject -join ', '
+        #endregion
+
+        #region Check to send mail to user
+        $sendMailToUser = $false
+
+        if (
+            (
+                $jsonFileContent.SendMail.When -eq 'Always'
+            ) -or
+            (
+                ($jsonFileContent.SendMail.When -eq 'OnlyOnError') -and
+                ($counter.Errors)
+            ) -or
+            (
+                ($jsonFileContent.SendMail.When -eq 'OnlyOnErrorOrAction') -and
+                (($counter.Errors) -or ($counter.FilesPrinted))
+            )
+        ) {
+            $sendMailToUser = $true
+        }
+        #endregion
+
+        #region Send mail
+        $mailParams += @{
+            To             = $jsonFileContent.SendMail.To
+            Message        = "
+                $systemErrorsHtmlList
+                $(
+                    '<p>Summary of SFTP actions:</p>'
+                )
+                $htmlTable"
+            LogFolder      = $LogParams.LogFolder
+            Header         = $ScriptName
+            EventLogSource = $ScriptName
+            Save           = $LogFile + ' - Mail.html'
+            ErrorAction    = 'Stop'
+        }
+
+        if ($mailParams.Attachments) {
+            $mailParams.Message +=
+            "<p><i>* Check the attachment for details</i></p>"
+        }
+
+        Get-ScriptRuntimeHC -Stop
+
+        if ($sendMailToUser) {
+            Write-Verbose 'Send e-mail to the user'
+
+            if ($counter.Errors) {
+                $mailParams.Bcc = $ScriptAdmin
+            }
+            Send-MailHC @mailParams
+        }
+        else {
+            Write-Verbose 'Send no e-mail to the user'
+
+            if ($counter.Errors) {
+                Write-Verbose 'Send e-mail to admin only with errors'
+
+                $mailParams.To = $ScriptAdmin
+                Send-MailHC @mailParams
+            }
         }
         #endregion
     }

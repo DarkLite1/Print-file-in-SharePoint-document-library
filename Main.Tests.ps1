@@ -27,6 +27,33 @@ BeforeAll {
         Encoding = 'utf8'
     }
 
+    $testData = @(
+        @{
+            DateTime         = Get-Date
+            SiteId           = $testInputFile.SharePoint.SiteId
+            DriveId          = $testInputFile.SharePoint.DriveId
+            FolderId         = $testInputFile.SharePoint.FolderId
+            Printer          = $testInputFile.Printer.Name
+            PrinterPort      = $testInputFile.Printer.Port
+            FileName         = 'File1.pdf'
+            FileCreationDate = Get-Date
+            Actions          = @('file downloaded', 'file printed')
+            Error            = $null
+            Printed          = $true
+        }
+    )
+
+    $testExportedExcelRows = @(
+        [PSCustomObject]@{
+            DateTime         = $testData[0].DateTime
+            FileName         = $testData[0].FileName
+            FileCreationDate = $testData[0].FileCreationDate
+            Printed          = $testData[0].Printed
+            Actions          = $testData[0].Actions -join ', '
+            Error            = $testData[0].Error
+        }
+    )
+
     $testScript = $PSCommandPath.Replace('.Tests.ps1', '.ps1')
     $testParams = @{
         ScriptName  = 'Test (Brecht)'
@@ -51,23 +78,11 @@ BeforeAll {
             [parameter(Mandatory)]
             [Int]$PrinterPort
         )
-
-        @{
-            DateTime         = Get-Date
-            SiteId           = $testInputFile.SharePoint.SiteId
-            DriveId          = $testInputFile.SharePoint.DriveId
-            FolderId         = $testInputFile.SharePoint.FolderId
-            Printer          = $testInputFile.Printer.Name
-            PrinterPort      = $testInputFile.Printer.Port
-            FileName         = 'File1.pdf'
-            FileCreationDate = Get-Date
-            Actions          = @('file downloaded', 'file printed')
-            Error            = $null
-            Printed          = $true
-        }
     }
 
-    Mock Invoke-PrintFileScriptHC
+    Mock Invoke-PrintFileScriptHC {
+        $testData
+    }
     Mock Send-MailHC
     Mock Write-EventLog
 }
@@ -261,7 +276,7 @@ Describe 'send an e-mail to the admin when' {
         }
     }
 }
-Describe 'when the SFTP script runs successfully' {
+Describe 'when the script runs successfully' {
     BeforeAll {
         $testInputFile | ConvertTo-Json -Depth 7 |
         Out-File @testOutParams
@@ -279,10 +294,10 @@ Describe 'when the SFTP script runs successfully' {
             ($PrinterName -eq $testInputFile.Printer.Name) -and
             ($PrinterPort -eq $testInputFile.Printer.Port)
         }
-    } -Tag test
+    }
     Context 'create an Excel file' {
         BeforeAll {
-            $testExcelLogFile = Get-ChildItem $testParams.LogFolder -File -Recurse -Filter "* - $((Split-Path $testOutParams.FilePath -Leaf).TrimEnd('.json')) - Log.xlsx"
+            $testExcelLogFile = Get-ChildItem $testParams.LogFolder -File -Recurse -Filter "* - Log.xlsx"
 
             $actual = Import-Excel -Path $testExcelLogFile.FullName -WorksheetName 'Overview'
         }
@@ -295,21 +310,19 @@ Describe 'when the SFTP script runs successfully' {
         It 'with the correct data in the rows' {
             foreach ($testRow in $testExportedExcelRows) {
                 $actualRow = $actual | Where-Object {
-                    $_.Source -eq $testRow.Source
+                    $_.FileName -eq $testRow.FileName
                 }
-                $actualRow.TaskName | Should -Be $testRow.TaskName
-                $actualRow.SftpServer | Should -Be $testRow.SftpServer
-                $actualRow.ComputerName | Should -Be $testRow.ComputerName
-                $actualRow.Destination | Should -Be $testRow.Destination
+
                 $actualRow.DateTime.ToString('yyyyMMdd') |
                 Should -Be $testRow.DateTime.ToString('yyyyMMdd')
-                $actualRow.Action | Should -Be $testRow.Action
-                $actualRow.FileName | Should -Be $testRow.FileName
-                $actualRow.FileSize | Should -Be $testRow.FileSize
+                $actualRow.FileCreationDate.ToString('yyyyMMdd') |
+                Should -Be $testRow.FileCreationDate.ToString('yyyyMMdd')
+                $actualRow.Printed | Should -Be $testRow.Printed
+                $actualRow.Actions | Should -Be $testRow.Actions
                 $actualRow.Error | Should -Be $testRow.Error
             }
         }
-    }
+    }  -Tag test
     Context 'send an e-mail' {
         It 'with attachment to the user' {
             Should -Invoke Send-MailHC -Exactly 1 -Scope Describe -ParameterFilter {
