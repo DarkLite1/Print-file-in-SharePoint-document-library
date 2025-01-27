@@ -37,7 +37,7 @@ Param (
     [parameter(Mandatory)]
     [String]$PrinterName,
     [parameter(Mandatory)]
-    [Int]$PrinterPort = 9100
+    [Int]$PrinterPort
 )
 
 try {

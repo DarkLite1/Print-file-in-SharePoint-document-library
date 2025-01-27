@@ -9,7 +9,7 @@ BeforeAll {
             DriveId  = 'theDriveId'
             FolderId = 'theFolderId'
         }
-        Printer = @{
+        Printer         = @{
             Name = 'thePrinterName'
             Port = 9100
         }
@@ -38,6 +38,35 @@ BeforeAll {
         ScriptAdmin = 'admin@contoso.com'
     }
 
+    function Invoke-PrintFileScriptHC {
+        param (
+            [parameter(Mandatory)]
+            [String]$SiteId,
+            [parameter(Mandatory)]
+            [String]$DriveId,
+            [parameter(Mandatory)]
+            [String]$FolderId,
+            [parameter(Mandatory)]
+            [String]$PrinterName,
+            [parameter(Mandatory)]
+            [Int]$PrinterPort
+        )
+
+        @{
+            SiteId           = $testInputFile.SharePoint.SiteId
+            DriveId          = $testInputFile.SharePoint.DriveId
+            FolderId         = $testInputFile.SharePoint.FolderId
+            Printer          = $testInputFile.Printer.Name
+            PrinterPort      = $testInputFile.Printer.Port
+            FileName         = 'File1.pdf'
+            FileCreationDate = Get-Date
+            Actions          = @('file downloaded', 'file printed')
+            Error            = $null
+            Printed          = $true
+        }
+    }
+
+    Mock Invoke-PrintFileScriptHC
     Mock Send-MailHC
     Mock Write-EventLog
 }
@@ -231,125 +260,6 @@ Describe 'send an e-mail to the admin when' {
         }
     }
 } -Tag test
-Describe 'correct the import file' {
-    Context "add trailing slashes to Paths starting with 'sftp:/'" {
-        It 'Source' {
-            $testNewInputFile = Copy-ObjectHC $testInputFile
-            $testNewInputFile.Tasks[0].Actions[0].Paths[0].Source = 'sftp:/a'
-            $testNewInputFile.Tasks[0].Actions[0].Paths[0].Destination = 'TestDrive:\b'
-
-            $testNewInputFile | ConvertTo-Json -Depth 7 |
-            Out-File @testOutParams
-
-            .$testScript @testParams
-
-            $Tasks[0].Actions[0].Paths[0].Source | Should -Be 'sftp:/a/'
-            $Tasks[0].Actions[0].Paths[0].Destination | Should -Be 'TestDrive:\b'
-        }
-        It 'Destination' {
-            $testNewInputFile = Copy-ObjectHC $testInputFile
-            $testNewInputFile.Tasks[0].Actions[0].Paths[0].Source = 'TestDrive:\b'
-            $testNewInputFile.Tasks[0].Actions[0].Paths[0].Destination = 'sftp:/a'
-
-            $testNewInputFile | ConvertTo-Json -Depth 7 |
-            Out-File @testOutParams
-
-            .$testScript @testParams
-
-            $Tasks[0].Actions[0].Paths[0].Source | Should -Be 'TestDrive:\b'
-            $Tasks[0].Actions[0].Paths[0].Destination | Should -Be 'sftp:/a/'
-        }
-    }
-}
-Describe 'execute the SFTP script when' {
-    BeforeAll {
-        $testJobArguments = @(
-            {
-                ($Session) -and
-                ($FilePath -eq $testParams.ScriptPath.PrintFile) -and
-                ($ArgumentList[0] -eq $testInputFile.Tasks[0].Sftp.ComputerName) -and
-                ($ArgumentList[1].GetType().Name -eq 'PSCredential') -and
-                ($ArgumentList[2].GetType().BaseType.Name -eq 'Array') -and
-                ($ArgumentList[3] -eq $testInputFile.MaxConcurrentJobs) -and
-                (-not $ArgumentList[4]) -and
-                ($ArgumentList[5] -eq $testInputFile.Tasks[0].Option.FileExtensions) -and
-                ($ArgumentList[6] -eq $testInputFile.Tasks[0].Option.OverwriteFile)
-            }
-        )
-
-        $testNewInputFile = Copy-ObjectHC $testInputFile
-        $testNewInputFile.Tasks[0].Actions = @(
-            $testNewInputFile.Tasks[0].Actions[0]
-        )
-    }
-    Context 'Tasks.Actions.ComputerName is not the localhost' {
-        BeforeAll {
-            $testNewInputFile | ConvertTo-Json -Depth 7 |
-            Out-File @testOutParams
-
-            .$testScript @testParams
-        }
-        It 'call New-PSSession' {
-            Should -Invoke New-PSSession -Times 1 -Exactly -Scope Context -ParameterFilter {
-                ($ErrorAction -eq 'SilentlyContinue') -and
-                ($ConfigurationName -eq $PSSessionConfiguration) -and
-                ($ComputerName -eq $testNewInputFile.Tasks[0].Actions[0].ComputerName)
-            }
-        }
-        It 'call Invoke-Command' {
-            Should -Invoke Invoke-Command -Times 1 -Exactly -Scope Context -ParameterFilter {
-                (& $testJobArguments[0])
-            }
-        }
-        It 'call Remove-PSSession' {
-            Should -Invoke Remove-PSSession -Times 1 -Exactly -Scope Context -ParameterFilter {
-                ($Session -eq $testPsSession)
-            }
-        }
-    }
-    Context 'Tasks.Actions.ComputerName is the localhost' {
-        BeforeAll {
-            $testNewInputFile.Tasks[0].Actions[0].ComputerName = 'localhost'
-
-            $testNewInputFile | ConvertTo-Json -Depth 7 |
-            Out-File @testOutParams
-
-            .$testScript @testParams
-        }
-        It 'do not call Invoke-Command ' {
-            Should -Not -Invoke Invoke-Command -Scope Context
-        }
-        It 'do not call New-PSSession ' {
-            Should -Not -Invoke New-PSSession -Scope Context
-        }
-        It 'do not call Remove-PSSession ' {
-            Should -Not -Invoke Remove-PSSession -Scope Context
-        }
-    }
-    Context 'with Tasks.Sftp.Credential.PasswordKeyFile' {
-        BeforeAll {
-            $testNewInputFile = Copy-ObjectHC $testInputFile
-            $testNewInputFile.Tasks[0].Actions = @(
-                $testNewInputFile.Tasks[0].Actions[0]
-            )
-
-            'sadfsd' | Out-File 'TestDrive:\key.txt'
-
-            $testNewInputFile.Tasks[0].Sftp.Credential.Password = $null
-            $testNewInputFile.Tasks[0].Sftp.Credential.PasswordKeyFile = 'TestDrive:\key.txt'
-
-            $testNewInputFile | ConvertTo-Json -Depth 7 |
-            Out-File @testOutParams
-
-            .$testScript @testParams
-        }
-        It 'call Invoke-Command' {
-            Should -Invoke Invoke-Command -Times 1 -Exactly -Scope Context -ParameterFilter {
-                ($ArgumentList[4] -ne $null)
-            }
-        }
-    }
-}
 Describe 'when the SFTP script runs successfully' {
     BeforeAll {
         $testInputFile | ConvertTo-Json -Depth 7 |
@@ -357,6 +267,18 @@ Describe 'when the SFTP script runs successfully' {
 
         .$testScript @testParams
     }
+    It 'the log folder is created' {
+        $testParams.LogFolder | Should -Exist
+    }
+    It 'the print file script is called' {
+        Should -Invoke Invoke-PrintFileScriptHC -Times 1 -Exactly -Scope Describe -ParameterFilter {
+            ($SiteId -eq $testInputFile.SharePoint.SiteId) -and
+            ($DriveId -eq $testInputFile.SharePoint.DriveId) -and
+            ($FolderId -eq $testInputFile.SharePoint.FolderId) -and
+            ($PrinterName -eq $testInputFile.Printer.Name) -and
+            ($PrinterPort -eq $testInputFile.Printer.Port)
+        }
+    } -Tag test
     Context 'create an Excel file' {
         BeforeAll {
             $testExcelLogFile = Get-ChildItem $testParams.LogFolder -File -Recurse -Filter "* - $((Split-Path $testOutParams.FilePath -Leaf).TrimEnd('.json')) - Log.xlsx"
@@ -630,67 +552,6 @@ Describe 'SendMail.When' {
             .$testScript @testParams
 
             Should -Invoke Send-MailHC @testParamFilter
-        }
-    }
-}
-Describe 'ReportOnly' {
-    BeforeAll {
-    }
-    Context 'when no previously exported Excel file is found' {
-        BeforeAll {
-            Get-ChildItem $testParams.LogFolder -Recurse -Filter '*.xlsx' |
-            Should -BeNullOrEmpty
-
-            $testInputFile | ConvertTo-Json -Depth 7 |
-            Out-File @testOutParams
-
-            .$testScript @testParams -ReportOnly
-        }
-        It 'no not create an Excel file' {
-            Get-ChildItem $testParams.LogFolder -Recurse -Filter '*.xlsx' |
-            Should -BeNullOrEmpty
-        }
-        It 'do not call the SFTP script' {
-            Should -Not -Invoke New-PSSession
-            Should -Not -Invoke Invoke-Command
-        }
-        It 'send an e-mail' {
-            Should -Invoke Send-MailHC -Exactly 1 -Scope Context
-
-            Should -Invoke Send-MailHC -Exactly 1 -Scope Context -ParameterFilter {
-                ($To -eq $testInputFile.SendMail.To) -and
-                ($Priority -eq 'Normal') -and
-                ($Subject -eq '0 moved') -and
-                (-not $Attachments) -and
-                ($Message -like "*Summary of all SFTP actions <b>executed today</b>*table*$($testInputFile.Tasks[0].TaskName)*$($testInputFile.Tasks[0].Sftp.ComputerName)*Source*Destination*Result*$($testInputFile.Tasks[0].Actions[0].Paths[0].Source)*$($testInputFile.Tasks[0].Actions[0].Paths[0].Destination)*0 moved*$($testInputFile.Tasks[0].Actions[0].Paths[1].Source)*$($testInputFile.Tasks[0].Actions[0].Paths[1].Destination)*0 moved*0 moved on $($testInputFile.Tasks[0].Actions[0].ComputerName)*")
-            }
-        }
-    }
-    Context 'when a previously exported Excel file is found' {
-        BeforeAll {
-            $testExportParams = @{
-                WorksheetName = 'Overview'
-                Path          = $testParams.LogFolder + '\' + (Get-Date).ToString('yyyy-MM-dd') + ' - ' + $testParams.ScriptName + ' - ' + (Split-Path $testParams.ImportFile -Leaf).TrimEnd('.json') + ' - Log.xlsx'
-            }
-            $testExportedExcelRows | Export-Excel @testExportParams
-
-            $testInputFile | ConvertTo-Json -Depth 7 |
-            Out-File @testOutParams
-
-            .$testScript @testParams -ReportOnly
-        }
-        It 'do not call the SFTP script' {
-            Should -Not -Invoke New-PSSession
-            Should -Not -Invoke Invoke-Command
-        }
-        It 'send an e-mail' {
-            Should -Invoke Send-MailHC -Exactly 1 -Scope Context -ParameterFilter {
-            ($To -eq $testInputFile.SendMail.To) -and
-            ($Attachments -eq $testExportParams.Path) -and
-            ($Priority -eq 'Normal') -and
-            ($Subject -eq '2 moved') -and
-            ($Message -like "*Summary of all SFTP actions <b>executed today</b>*table*$($testInputFile.Tasks[0].TaskName)*$($testInputFile.Tasks[0].Sftp.ComputerName)*Source*Destination*Result*$($testInputFile.Tasks[0].Actions[0].Paths[0].Source)*$($testInputFile.Tasks[0].Actions[0].Paths[0].Destination)*1 moved*$($testInputFile.Tasks[0].Actions[0].Paths[1].Source)*$($testInputFile.Tasks[0].Actions[0].Paths[1].Destination)*1 moved*2 moved on $($testInputFile.Tasks[0].Actions[0].ComputerName)*")
-            }
         }
     }
 }

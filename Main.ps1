@@ -73,6 +73,30 @@ Param (
 )
 
 Begin {
+    function Invoke-PrintFileScriptHC {
+        param (
+            [parameter(Mandatory)]
+            [String]$SiteId,
+            [parameter(Mandatory)]
+            [String]$DriveId,
+            [parameter(Mandatory)]
+            [String]$FolderId,
+            [parameter(Mandatory)]
+            [String]$PrinterName,
+            [parameter(Mandatory)]
+            [Int]$PrinterPort
+        )
+
+        $params = @{
+            SiteId      = $SiteId
+            DriveId     = $DriveId
+            FolderId    = $FolderId
+            PrinterName = $PrinterName
+            PrinterPort = $PrinterPort
+        }
+        & $scriptPathItem.PrintFile @params
+    }
+
     Try {
         Get-ScriptRuntimeHC -Start
         Import-EventLogParamsHC -Source $ScriptName
@@ -207,7 +231,7 @@ Process {
             PrinterName = $jsonFileContent.Printer.Name
             PrinterPort = $jsonFileContent.Printer.Port
         }
-        & $scriptPathItem.PrintFile @params
+        $result = Invoke-PrintFileScriptHC @params
         #endregion
     }
     Catch {
