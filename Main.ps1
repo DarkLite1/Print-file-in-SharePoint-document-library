@@ -231,7 +231,7 @@ Process {
             PrinterName = $jsonFileContent.Printer.Name
             PrinterPort = $jsonFileContent.Printer.Port
         }
-        $result = Invoke-PrintFileScriptHC @params
+        $results = Invoke-PrintFileScriptHC @params
         #endregion
     }
     Catch {
@@ -244,221 +244,95 @@ Process {
 
 End {
     try {
-        if (-not $inputFiles) {
-            Write-Verbose "No tasks found, exit script"
-            Write-EventLog @EventEndParams; Exit
-        }
-
-        # $M = "Wait for all $($inputFile.Job.Object.count) jobs to finish"
-        # Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
-
-        $mailParams = @{ }
-        $htmlTableTasks = @()
-
-        #region Count totals
-        $totalCounter = @{
-            All          = @{
-                Errors          = 0
-                RowsInExcel     = 0
-                DownloadedFiles = 0
-            }
-            SystemErrors = (
-                $Error.Exception.Message | Measure-Object
-            ).Count
-        }
-
-        $totalCounter.All.Errors += $totalCounter.SystemErrors
-        #endregion
-
-        foreach ($inputFile in $inputFiles) {
-            #region Count task results
-            $counter = @{
-                RowsInExcel     = (
-                    $inputFile.ExcelFile.Content | Measure-Object
-                ).Count
-                DownloadedFiles = (
-                    $inputFile.Tasks.Job.Result.Where({ $_.DownloadedOn }) | Measure-Object
-                ).Count
-                Errors          = @{
-                    InExcelFile      = (
-                        $inputFile.ExcelFile.Error | Measure-Object
-                    ).Count
-                    InTasks          = (
-                        $inputFile.Tasks.Where({ $_.Error }) | Measure-Object
-                    ).Count
-                    DownloadingFiles = (
-                        $inputFile.Tasks.Job.Result.Where({ $_.Error }) | Measure-Object
-                    ).Count
-                    Other            = (
-                        $inputFile.Error | Measure-Object
-                    ).Count
-                }
-            }
-
-            $totalCounter.All.RowsInExcel += $counter.RowsInExcel
-            $totalCounter.All.DownloadedFiles += $counter.DownloadedFiles
-            $totalCounter.All.Errors += (
-                $counter.Errors.InExcelFile +
-                $counter.Errors.InTasks +
-                $counter.Errors.DownloadingFiles +
-                $counter.Errors.Other
-            )
-            #endregion
-
-            #region Create HTML table
-            $htmlTableTasks += "
-                <table>
-                <tr>
-                    <th colspan=`"2`">$($inputFile.ExcelFile.Item.Name)</th>
-                </tr>
-                <tr>
-                    <td>Details</td>
-                    <td>
-                        <a href=`"$($inputFile.ExcelFile.OutputFolder)`">Output folder</a>
-                    </td>
-                </tr>
-                <tr>
-                    <td>$($counter.RowsInExcel)</td>
-                    <td>Files to download</td>
-                </tr>
-                <tr>
-                    <td>$($counter.DownloadedFiles)</td>
-                    <td>Files successfully downloaded</td>
-                </tr>
-                $(
-                    if ($counter.Errors.InExcelFile) {
-                        "<tr>
-                            <td style=``"background-color: red``">$($counter.Errors.InExcelFile)</td>
-                            <td style=``"background-color: red``">Error{0} in the Excel file</td>
-                        </tr>" -f $(if ($counter.Errors.InExcelFile -ne 1) {'s'})
-                    }
-                )
-                $(
-                    if ($counter.Errors.DownloadingFiles) {
-                        "<tr>
-                            <td style=``"background-color: red``">$($counter.Errors.DownloadingFiles)</td>
-                            <td style=``"background-color: red``">File{0} failed to download</td>
-                        </tr>" -f $(if ($counter.Errors.DownloadingFiles -ne 1) {'s'})
-                    }
-                )
-                $(
-                    if ($counter.Errors.Other) {
-                        "<tr>
-                            <td style=``"background-color: red``">$($counter.Errors.Other)</td>
-                            <td style=``"background-color: red``">Error{0} found:<br>{1}</td>
-                        </tr>" -f $(
-                            if ($counter.Errors.Other -ne 1) {'s'}
-                        ),
-                        (
-                            '- ' + $($inputFile.Error -join '<br> - ')
-                        )
-                    }
-                )
-                $(
-                    if($inputFile.Tasks) {
-                        "<tr>
-                            <th colspan=``"2``">Downloads per folder</th>
-                        </tr>"
-                    }
-                )
-                $(
-                    foreach (
-                        $task in
-                        (
-                            $inputFile.Tasks |
-                            Sort-Object {$_.DownloadFolder.Name}
-                        )
-                    ) {
-                        $errorCount = $task.Job.Result.Where(
-                            {$_.Error}).Count
-
-                        $template = if ($errorCount) {
-                            "<tr>
-                            <td style=``"background-color: red``">{0}/{1}</td>
-                            <td style=``"background-color: red``">{2}{3}</td>
-                            </tr>"
-                        } else {
-                            "<tr>
-                                <td>{0}/{1}</td>
-                                <td>{2}{3}</td>
-                            </tr>"
-                        }
-
-                        $template -f
-                        $(
-                            $task.Job.Result.Where({$_.DownloadedOn}).Count
-                        ),
-                        $(
-                            ($task.ItemsToDownload | Measure-Object).Count
-                        ),
-                        $(
-                            $task.DownloadFolder.Name
-                        ),
-                        $(
-                            if ($errorCount) {
-                                ' ({0} error{1})' -f
-                                $errorCount, $(if ($errorCount -ne 1) {'s'})
-                            }
-                        )
-                    }
-                )
-            </table>
-            "
-            #endregion
-        }
-
-        $htmlTableTasks = $htmlTableTasks -join '<br>'
-
-        #region Send summary mail to user
-
-        #region Mail subject and priority
-        $mailParams.Priority = 'Normal'
-        $mailParams.Subject = '{0}/{1} file{2} downloaded' -f
-        $totalCounter.All.DownloadedFiles,
-        $totalCounter.All.RowsInExcel,
-        $(
-            if ($totalCounter.All.RowsInExcel -ne 1) {
-                's'
-            }
-        )
-
-        if (
-            $totalErrorCount = $totalCounter.All.Errors
-        ) {
-            $mailParams.Priority = 'High'
-            $mailParams.Subject += ", $totalErrorCount error{0}" -f $(
-                if ($totalErrorCount -ne 1) { 's' }
-            )
+        #region Counter
+        $counter = @{
+            FilesPrinted = (
+                $results | Where-Object { $_.Printed } | Measure-Object).Count
+            Errors       = (
+                $results | Where-Object { $_.Error } | Measure-Object).Count
         }
         #endregion
 
-        #region Create error html lists
-        $systemErrorsHtmlList = if ($totalCounter.SystemErrors) {
-            "<p>Detected <b>{0} system error{1}</b>:{2}</p>" -f $totalCounter.SystemErrors,
+        #region Create system error html lists
+        $countSystemErrors = (
+            $Error.Exception.Message | Measure-Object
+        ).Count
+
+        $systemErrorsHtmlList = if ($countSystemErrors) {
+            "<p>Detected <b>{0} system error{1}</b>:{2}</p>" -f $countSystemErrors,
             $(
-                if ($totalCounter.SystemErrors -ne 1) { 's' }
+                if ($countSystemErrors -ne 1) { 's' }
             ),
             $(
-                $Error.Exception.Message | Where-Object { $_ } |
-                ConvertTo-HtmlListHC
+                $errorList = $Error.Exception.Message | Where-Object { $_ }
+                $errorList | ConvertTo-HtmlListHC
+
+                $errorList.foreach(
+                    {
+                        $M = "System error: $_"
+                        Write-Warning $M
+                        Write-EventLog @EventErrorParams -Message $M
+                    }
+                )
             )
         }
+
+        $counter.Errors += $countSystemErrors
         #endregion
 
-        $mailParams += @{
-            To        = $MailTo
-            Bcc       = $ScriptAdmin
-            Message   = "
-                $systemErrorsHtmlList
-                <p>Summary:</p>
-                $htmlTableTasks"
-            LogFolder = $LogParams.LogFolder
-            Header    = $ScriptName
-            Save      = $LogFile + ' - Mail.html'
+        #region Create Excel objects
+        $exportToExcel = $results | Select-Object 'DateTime',
+        'FileName', 'FileCreationDate', 'Printed',
+        @{
+            Name       = 'Actions'
+            Expression = { $_.Actions -join ', ' }
+        },
+        'Error'
+        #endregion
+
+        $mailParams = @{}
+
+        #region Create Excel file
+        $createExcelFile = $false
+
+        if (
+            ($exportToExcel) -and
+            (
+                (
+                        ($jsonFileContent.ExportExcelFile.When -eq 'OnlyOnError') -and
+                        ($counter.Errors)
+                ) -or
+                (
+                    (
+                        $jsonFileContent.ExportExcelFile.When -eq 'OnlyOnErrorOrAction'
+                    ) -and
+                    (
+                        ($counter.Errors) -or ($counter.FilesPrinted)
+                    )
+                )
+            )
+        ) {
+            $createExcelFile = $true
         }
 
-        Get-ScriptRuntimeHC -Stop
-        Send-MailHC @mailParams
+        if ($createExcelFile) {
+            $excelParams = @{
+                Path          = "$logFile - log.xlsx"
+                TableName     = 'Overview'
+                WorksheetName = 'Overview'
+                FreezeTopRow  = $true
+                AutoSize      = $true
+                Verbose       = $false
+            }
+
+            $M = "Export {0} rows to Excel sheet '{1}'" -f
+            $exportToExcel.Count, $excelParams.WorksheetName
+            Write-Verbose $M; Write-EventLog @EventOutParams -Message $M
+
+            $exportToExcel | Export-Excel @excelParams
+
+            $mailParams.Attachments = $excelParams.Path
+        }
         #endregion
     }
     catch {

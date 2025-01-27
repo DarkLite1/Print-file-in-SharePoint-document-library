@@ -44,6 +44,7 @@ try {
     $ErrorActionPreference = 'Stop'
 
     $result = @{
+        DateTime         = Get-Date
         SiteId           = $SiteId
         DriveId          = $DriveId
         FolderId         = $FolderId

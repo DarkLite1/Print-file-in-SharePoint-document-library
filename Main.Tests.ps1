@@ -53,6 +53,7 @@ BeforeAll {
         )
 
         @{
+            DateTime         = Get-Date
             SiteId           = $testInputFile.SharePoint.SiteId
             DriveId          = $testInputFile.SharePoint.DriveId
             FolderId         = $testInputFile.SharePoint.FolderId
@@ -259,7 +260,7 @@ Describe 'send an e-mail to the admin when' {
             }
         }
     }
-} -Tag test
+}
 Describe 'when the SFTP script runs successfully' {
     BeforeAll {
         $testInputFile | ConvertTo-Json -Depth 7 |
