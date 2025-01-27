@@ -278,6 +278,27 @@ End {
         $counter.Errors += $countSystemErrors
         #endregion
 
+        #region Create HTML table
+        Write-Verbose 'Create HTML table'
+
+        $htmlTable = "
+        <table>
+            <tr>
+                <th>Printed files</th>
+                <td>$($counter.FilesPrinted)</td>
+            </tr>
+            $(
+                if ($counter.Errors) {
+                    "<tr>
+                        <th>Errors</th>
+                        <td>$($counter.Errors)</td>
+                    </tr>"
+                }
+            )
+        </table>
+        "
+        #endregion
+
         #region Create Excel objects
         $exportToExcel = $results | Select-Object 'DateTime',
         'FileName', 'FileCreationDate', 'Printed',
@@ -336,7 +357,7 @@ End {
         #region Mail subject and priority
         $mailParams += @{
             Priority = 'Normal'
-            Subject  = @("$($counter.FilesPrinted) moved")
+            Subject  = @("$($counter.FilesPrinted) printed")
         }
 
         if ($counter.Errors) {
@@ -375,7 +396,7 @@ End {
             Message        = "
                 $systemErrorsHtmlList
                 $(
-                    '<p>Summary of SFTP actions:</p>'
+                    '<p>Summary of print actions:</p>'
                 )
                 $htmlTable"
             LogFolder      = $LogParams.LogFolder

@@ -322,15 +322,15 @@ Describe 'when the script runs successfully' {
                 $actualRow.Error | Should -Be $testRow.Error
             }
         }
-    }  -Tag test
+    }
     Context 'send an e-mail' {
         It 'with attachment to the user' {
             Should -Invoke Send-MailHC -Exactly 1 -Scope Describe -ParameterFilter {
-            ($To -eq $testInputFile.SendMail.To) -and
-            ($Priority -eq 'Normal') -and
-            ($Subject -eq '2 moved') -and
-            ($Attachments -like '*- Log.xlsx') -and
-            ($Message -like "*Summary of SFTP actions*table*$($testInputFile.Tasks[0].TaskName)*$($testInputFile.Tasks[0].Sftp.ComputerName)*Source*Destination*Result*$($testInputFile.Tasks[0].Actions[0].Paths[0].Source)*$($testInputFile.Tasks[0].Actions[0].Paths[0].Destination)*1 moved*$($testInputFile.Tasks[0].Actions[0].Paths[1].Source)*$($testInputFile.Tasks[0].Actions[0].Paths[1].Destination)*1 moved*2 moved on $($testInputFile.Tasks[0].Actions[0].ComputerName)*")
+                ($To -eq $testInputFile.SendMail.To) -and
+                ($Priority -eq 'Normal') -and
+                ($Subject -eq '1 printed') -and
+                ($Attachments -like '*- Log.xlsx') -and
+                ($Message -like "*Summary of print actions*table*Printed files*1**")
             }
         }
     }
@@ -338,6 +338,13 @@ Describe 'when the script runs successfully' {
 Describe 'ExportExcelFile.When' {
     Context 'create no Excel file' {
         It "'Never'" {
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $true
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
+            }
+
             $testNewInputFile = Copy-ObjectHC $testInputFile
             $testNewInputFile.ExportExcelFile.When = 'Never'
 
@@ -350,6 +357,14 @@ Describe 'ExportExcelFile.When' {
             Should -BeNullOrEmpty
         }
         It "'OnlyOnError' and no errors are found" {
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $true
+            $testNewDate.Errors = $null
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
+            }
+
             $testNewInputFile = Copy-ObjectHC $testInputFile
             $testNewInputFile.ExportExcelFile.When = 'OnlyOnError'
 
@@ -362,9 +377,12 @@ Describe 'ExportExcelFile.When' {
             Should -BeNullOrEmpty
         }
         It "'OnlyOnErrorOrAction' and there are no errors and no actions" {
-            Mock Invoke-Command {
-            } -ParameterFilter {
-                $FilePath -eq $testParams.ScriptPath.PrintFile
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $false
+            $testNewDate.Errors = $null
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
             }
 
             $testNewInputFile = Copy-ObjectHC $testInputFile
@@ -451,7 +469,7 @@ Describe 'ExportExcelFile.When' {
             Get-ChildItem $testParams.LogFolder -File -Recurse -Filter '*.xlsx' |
             Should -Not -BeNullOrEmpty
         }
-    }
+    } -Tag test
 }
 Describe 'SendMail.When' {
     BeforeAll {
