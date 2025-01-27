@@ -21,7 +21,7 @@
     .PARAMETER FolderId
         ID of the SharePoint folder
 
-        $driveRootChildren = Get-MgDriveRootChild -DriveId $DriveId
+        $driveRootChildren = Get-MgDriveRootChild -DriveId $drive.id
         $driveRootChildren.id
 
         Get-MgDriveItem -DriveId $DriveId -DriveItemId $driveRootChildren.id
@@ -41,9 +41,6 @@ Start-Transcript -Path "T:\Test\Brecht\PowerShell\Print file in SharePoint docum
 
 $ErrorActionPreference = 'Stop'
 $VerbosePreference = 'Continue'
-
-Write-Verbose 'Install printer'
-Add-Printer -ConnectionName $PrinterName
 
 #region Connect to Microsoft Graph
 Write-Verbose 'Connect to MS Graph'

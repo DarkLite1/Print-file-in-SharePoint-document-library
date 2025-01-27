@@ -12,7 +12,11 @@
     "Name": "BELPRBRAN603",
     "Port": 9100
   },
+  "ExportExcelFile": {
+    "When": "OnlyOnErrorOrAction"
+  },
   "?": {
-    "SendMail.When": "Never | OnlyOnError | OnlyOnErrorOrAction | Always"
+    "SendMail.When": "Never | OnlyOnError | OnlyOnErrorOrAction | Always",
+    "ExportExcelFile.When": "Never | OnlyOnError | OnlyOnErrorOrAction"
   }
 }

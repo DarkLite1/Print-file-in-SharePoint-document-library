@@ -13,8 +13,47 @@
     .PARAMETER ImportFile
         Contains all the parameters for the script
 
-    .PARAMETER MailTo
-        E-mail addresses of where to send the summary e-mail
+    .PARAMETER SharePoint.SiteId
+        ID of the SharePoint site
+
+        $site = Get-MgSite -SiteId 'hcgroupnet.sharepoint.com:/sites/BEL_xx'
+        $site.id
+
+    .PARAMETER SharePoint.DriveId
+        ID of the SharePoint drive
+
+        $drives = Get-MgSiteDrive -SiteId $site.Id
+        $drive.id
+
+    .PARAMETER SharePoint.FolderId
+        ID of the SharePoint folder
+
+        $driveRootChildren = Get-MgDriveRootChild -DriveId $drive.id
+        $driveRootChildren.id
+
+        Get-MgDriveItem -DriveId $DriveId -DriveItemId $driveRootChildren.id
+
+    .PARAMETER Printer.Name
+        Name or IP address of the printer to print the file
+
+    .PARAMETER Printer.Port
+        Port of the printer to print the file
+
+    .PARAMETER SendMail
+        Contains all the information for sending e-mails.
+
+    .PARAMETER SendMail.To
+        Destination e-mail addresses.
+
+    .PARAMETER SendMail.When
+        When does the script need to send an e-mail.
+
+        Valid values:
+        - Always              : Always sent an e-mail
+        - Never               : Never sent an e-mail
+        - OnlyOnError         : Only sent an e-mail when errors where detected
+        - OnlyOnErrorOrAction : Only sent an e-mail when errors where detected
+                                or when a file is printed
 #>
 
 [CmdLetBinding()]
@@ -23,6 +62,9 @@ Param (
     [String]$ScriptName,
     [Parameter(Mandatory)]
     [String]$ImportFile,
+    [HashTable]$ScriptPath = @{
+        PrintFile = "$PSScriptRoot\Print file.ps1"
+    },
     [String]$LogFolder = "$env:POWERSHELL_LOG_FOLDER\File or folder\$ScriptName",
     [String[]]$ScriptAdmin = @(
         $env:POWERSHELL_SCRIPT_ADMIN,
@@ -32,37 +74,42 @@ Param (
 
 Begin {
     Try {
+        Get-ScriptRuntimeHC -Start
         Import-EventLogParamsHC -Source $ScriptName
         Write-EventLog @EventStartParams
-        $startDate = (Get-ScriptRuntimeHC -Start).ToString('yyyy-MM-dd HHmmss')
-
         $Error.Clear()
 
-        #region Test 7 zip installed
-        $7zipPath = "$env:ProgramFiles\7-Zip\7z.exe"
+        #region Test path exists
+        $scriptPathItem = @{}
 
-        if (-not (Test-Path -Path $7zipPath -PathType 'Leaf')) {
-            throw "7 zip file '$7zipPath' not found"
-        }
+        $ScriptPath.GetEnumerator().ForEach(
+            {
+                try {
+                    $key = $_.Key
+                    $value = $_.Value
 
-        Set-Alias Start-SevenZip $7zipPath
+                    $params = @{
+                        Path        = $value
+                        ErrorAction = 'Stop'
+                    }
+                    $scriptPathItem[$key] = (Get-Item @params).FullName
+                }
+                catch {
+                    throw "ScriptPath.$key '$value' not found"
+                }
+            }
+        )
         #endregion
 
-        #region Logging
+        #region Create log folder
         try {
-            $joinParams = @{
-                Path        = $LogFolder
-                ChildPath   = $startDate
-                ErrorAction = 'Ignore'
-            }
-
             $logParams = @{
-                LogFolder    = New-Item -Path (Join-Path @joinParams) -ItemType 'Directory' -Force -ErrorAction 'Stop'
+                LogFolder    = New-Item -Path $LogFolder -ItemType 'Directory' -Force -ErrorAction 'Stop'
                 Name         = $ScriptName
                 Date         = 'ScriptStartTime'
                 NoFormatting = $true
             }
-            $logFile = New-LogFileNameHC @logParams
+            $logFile = New-LogFileNameHC @LogParams
         }
         Catch {
             throw "Failed creating the log folder '$LogFolder': $_"
@@ -73,54 +120,210 @@ Begin {
         $M = "Import .json file '$ImportFile'"
         Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
 
-        $file = Get-Content $ImportFile -Raw -EA Stop -Encoding UTF8 |
-        ConvertFrom-Json
+        $params = @{
+            LiteralPath = $ImportFile
+            Raw         = $true
+            ErrorAction = 'Stop'
+            Encoding    = 'UTF8'
+        }
+        $jsonFileContent = Get-Content @params | ConvertFrom-Json
         #endregion
 
         #region Test .json file properties
-        Try {
-            if (-not ($MailTo = $file.MailTo)) {
-                throw "Property 'MailTo' not found"
-            }
+        Write-Verbose 'Test .json file properties'
 
-            if (-not ($MaxConcurrentJobs = $file.MaxConcurrentJobs)) {
-                throw "Property 'MaxConcurrentJobs' not found"
+        try {
+            @(
+                'SharePoint', 'Printer', 'SendMail', 'ExportExcelFile'
+            ).where(
+                { -not $jsonFileContent.$_ }
+            ).foreach(
+                { throw "Property '$_' not found" }
+            )
+
+            #region Test SendMail
+            @('To', 'When').Where(
+                { -not $jsonFileContent.SendMail.$_ }
+            ).foreach(
+                { throw "Property 'SendMail.$_' not found" }
+            )
+
+            if ($jsonFileContent.SendMail.When -notMatch '^Never$|^Always$|^OnlyOnError$|^OnlyOnErrorOrAction$') {
+                throw "Property 'SendMail.When' with value '$($jsonFileContent.SendMail.When)' is not valid. Accepted values are 'Always', 'Never', 'OnlyOnError' or 'OnlyOnErrorOrAction'"
             }
+            #endregion
+
+            #region Test ExportExcelFile
+            @('When').Where(
+                { -not $jsonFileContent.ExportExcelFile.$_ }
+            ).foreach(
+                { throw "Property 'ExportExcelFile.$_' not found" }
+            )
+
+            if ($jsonFileContent.ExportExcelFile.When -notMatch '^Never$|^OnlyOnError$|^OnlyOnErrorOrAction$') {
+                throw "Property 'ExportExcelFile.When' with value '$($jsonFileContent.ExportExcelFile.When)' is not valid. Accepted values are 'Never', 'OnlyOnError' or 'OnlyOnErrorOrAction'"
+            }
+            #endregion
+
+            #region Test integer value
             try {
-                $null = $MaxConcurrentJobs.ToInt16($null)
+                [int]$MaxConcurrentJobs = $jsonFileContent.MaxConcurrentJobs
             }
             catch {
-                throw "Property 'MaxConcurrentJobs' needs to be a number, the value '$MaxConcurrentJobs' is not supported."
+                throw "Property 'MaxConcurrentJobs' needs to be a number, the value '$($jsonFileContent.MaxConcurrentJobs)' is not supported."
+            }
+            #endregion
+
+            $Tasks = $jsonFileContent.Tasks
+
+            foreach ($task in $Tasks) {
+                @(
+                    'TaskName', 'Sftp', 'Actions', 'Option'
+                ).where(
+                    { -not $task.$_ }
+                ).foreach(
+                    { throw "Property 'Tasks.$_' not found" }
+                )
+
+                if (-not $task.TaskName) {
+                    throw "Property 'Tasks.TaskName' not found"
+                }
+
+                @('ComputerName', 'Credential').where(
+                    { -not $task.Sftp.$_ }
+                ).foreach(
+                    { throw "Property 'Tasks.Sftp.$_' not found" }
+                )
+
+                @('UserName').Where(
+                    { -not $task.Sftp.Credential.$_ }
+                ).foreach(
+                    { throw "Property 'Tasks.Sftp.Credential.$_' not found" }
+                )
+
+                if (
+                    $task.Sftp.Credential.Password -and
+                    $task.Sftp.Credential.PasswordKeyFile
+                ) {
+                    throw "Property 'Tasks.Sftp.Credential.Password' and 'Tasks.Sftp.Credential.PasswordKeyFile' cannot be used at the same time"
+                }
+
+                if (
+                    (-not $task.Sftp.Credential.Password) -and
+                    (-not $task.Sftp.Credential.PasswordKeyFile)
+                ) {
+                    throw "Property 'Tasks.Sftp.Credential.Password' or 'Tasks.Sftp.Credential.PasswordKeyFile' not found"
+                }
+
+                #region Test boolean values
+                foreach (
+                    $boolean in
+                    @(
+                        'OverwriteFile'
+                    )
+                ) {
+                    try {
+                        $null = [Boolean]::Parse($task.Option.$boolean)
+                    }
+                    catch {
+                        throw "Property 'Tasks.Option.$boolean' is not a boolean value"
+                    }
+                }
+                #endregion
+
+                #region Test file extensions
+                $task.Option.FileExtensions.Where(
+                    { $_ -and ($_ -notLike '.*') }
+                ).foreach(
+                    { throw "Property 'Tasks.Option.FileExtensions' needs to start with a dot. For example: '.txt', '.xml', ..." }
+                )
+                #endregion
+
+                if (-not $task.Actions) {
+                    throw 'Tasks.Actions is missing'
+                }
+
+                #region Test unique ComputerName
+                $task.Actions | Group-Object -Property {
+                    $_.ComputerName
+                } |
+                Where-Object { $_.Count -ge 2 } | ForEach-Object {
+                    throw "Duplicate 'Tasks.Actions.ComputerName' found: $($_.Name)"
+                }
+                #endregion
+
+                foreach ($action in $task.Actions) {
+                    if ($action.PSObject.Properties.Name -notContains 'ComputerName') {
+                        throw "Property 'Tasks.Actions.ComputerName' not found"
+                    }
+
+                    @('Paths').Where(
+                        { -not $action.$_ }
+                    ).foreach(
+                        { throw "Property 'Tasks.Actions.$_' not found" }
+                    )
+
+                    foreach ($path in $action.Paths) {
+                        @(
+                            'Source', 'Destination'
+                        ).Where(
+                            { -not $path.$_ }
+                        ).foreach(
+                            {
+                                throw "Property 'Tasks.Actions.Paths.$_' not found"
+                            }
+                        )
+
+                        if (
+                            (
+                                ($path.Source -like '*/*') -and
+                                ($path.Destination -like '*/*')
+                            ) -or
+                            (
+                                ($path.Source -like '*\*') -and
+                                ($path.Destination -like '*\*')
+                            ) -or
+                            (
+                                ($path.Source -like 'sftp*') -and
+                                ($path.Destination -like 'sftp*')
+                            ) -or
+                            (
+                                -not (
+                                    ($path.Source -like 'sftp:/*') -or
+                                    ($path.Destination -like 'sftp:/*')
+                                )
+                            )
+                        ) {
+                            throw "Property 'Tasks.Actions.Paths.Source' and 'Tasks.Actions.Paths.Destination' needs to have one SFTP path ('sftp:/....') and one folder path (c:\... or \\server$\...). Incorrect values: Source '$($path.Source)' Destination '$($path.Destination)'"
+                        }
+                    }
+
+                    #region Test unique Source Destination
+                    $action.Paths | Group-Object -Property 'Source' |
+                    Where-Object { $_.Count -ge 2 } | ForEach-Object {
+                        throw "Duplicate 'Tasks.Actions.Paths.Source' found: '$($_.Name)'. Use separate Tasks to run them sequentially instead of in Actions, which is ran in parallel"
+                    }
+                    #endregion
+
+                    #region Test unique Source Destination
+                    $action.Paths | Group-Object -Property 'Destination' |
+                    Where-Object { $_.Count -ge 2 } | ForEach-Object {
+                        throw "Duplicate 'Tasks.Actions.Paths.Destination' found: '$($_.Name)'. Use separate Tasks to run them sequentially instead of in Actions, which is ran in parallel"
+                    }
+                    #endregion
+                }
             }
 
-            if (-not ($DropFolder = $file.DropFolder)) {
-                throw "Property 'DropFolder' not found"
+            #region Test unique TaskName
+            $Tasks.TaskName | Group-Object | Where-Object {
+                $_.Count -gt 1
+            } | ForEach-Object {
+                throw "Property 'Tasks.TaskName' with value '$($_.Name)' is not unique. Each task name needs to be unique."
             }
-            if (-not ($ExcelFileWorksheetName = $file.ExcelFileWorksheetName)) {
-                throw "Property 'ExcelFileWorksheetName' not found"
-            }
-            if (-not (Test-Path -LiteralPath $DropFolder -PathType Container)) {
-                throw "Property 'DropFolder': Path '$DropFolder' not found"
-            }
+            #endregion
         }
-        Catch {
+        catch {
             throw "Input file '$ImportFile': $_"
-        }
-        #endregion
-
-        #region Get Excel files in drop folder
-        $params = @{
-            LiteralPath = $DropFolder
-            Filter      = '*.xlsx'
-            ErrorAction = 'Stop'
-        }
-        $dropFolderExcelFiles = Get-ChildItem @params
-
-        if (-not $dropFolderExcelFiles) {
-            $M = "No Excel files found in drop folder '$DropFolder'"
-            Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
-
-            Write-EventLog @EventEndParams; Exit
         }
         #endregion
     }
