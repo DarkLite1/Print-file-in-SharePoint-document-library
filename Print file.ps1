@@ -134,6 +134,7 @@ try {
         throw 'No files in folder'
     }
 
+    $result.FileName = $mostRecentFile.Name
     $result.FileCreationDate = $mostRecentFile.CreatedDateTime
     #endregion
 
