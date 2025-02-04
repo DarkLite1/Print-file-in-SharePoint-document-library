@@ -4,6 +4,9 @@
 
 BeforeAll {
     $testInputFile = @{
+        Option = @{
+            PrintDuplicate = $true
+        }
         SharePoint      = @{
             SiteId   = 'theSiteId'
             DriveId  = 'theDriveId'
@@ -199,6 +202,22 @@ Describe 'send an e-mail to the admin when' {
                 }
                 Should -Invoke Write-EventLog -Exactly 1 -ParameterFilter {
                     $EntryType -eq 'Error'
+                }
+            }
+            It 'Option.<_> not a boolean' -ForEach @(
+                'PrintDuplicate'
+            ) {
+                $testNewInputFile = Copy-ObjectHC $testInputFile
+                $testNewInputFile.Option.$_ = $null
+
+                $testNewInputFile | ConvertTo-Json -Depth 7 |
+                Out-File @testOutParams
+
+                .$testScript @testParams
+
+                Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
+                        (&$MailAdminParams) -and
+                        ($Message -like "*$ImportFile*Property 'Option.$_' is not a boolean value*")
                 }
             }
             It 'SendMail.<_> not found' -ForEach @(
@@ -568,4 +587,4 @@ Describe 'SendMail.When' {
             Should -Invoke Send-MailHC @testParamFilter
         }
     }
- } -Tag test
+ }

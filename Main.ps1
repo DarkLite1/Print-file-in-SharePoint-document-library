@@ -39,6 +39,13 @@
     .PARAMETER Printer.Port
         Port of the printer to print the file
 
+    .PARAMETER Option.PrintDuplicate
+        Print the same file multiple times
+
+        Valid values:
+        - $true  : Print the same file multiple times
+        - $false : Print the same file only once
+
     .PARAMETER SendMail
         Contains all the information for sending e-mails.
 
@@ -179,6 +186,22 @@ Begin {
             ).foreach(
                 { throw "Property 'Printer.$_' not found" }
             )
+            #endregion
+
+            #region Test boolean values
+            foreach (
+                $boolean in
+                @(
+                    'PrintDuplicate'
+                )
+            ) {
+                try {
+                    $null = [Boolean]::Parse($jsonFileContent.Option.$boolean)
+                }
+                catch {
+                    throw "Property 'Option.$boolean' is not a boolean value"
+                }
+            }
             #endregion
 
             #region Test SendMail
