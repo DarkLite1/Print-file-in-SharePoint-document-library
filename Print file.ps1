@@ -136,7 +136,7 @@ try {
 
     $mostRecentFile = $driveItemChild | Sort-Object -Property CreatedDateTime -Descending | Select-Object -First 1
 
-    Write-Verbose "Found most recent file '$($mostRecentFile.Name)' craated '$($mostRecentFile.CreatedDateTime)'"
+    Write-Verbose "Found most recent file '$($mostRecentFile.Name)' created '$($mostRecentFile.CreatedDateTime)'"
 
     if (-not $mostRecentFile) {
         throw 'No files in folder'
@@ -144,6 +144,13 @@ try {
 
     $result.FileName = $mostRecentFile.Name
     $result.FileCreationDate = $mostRecentFile.CreatedDateTime
+    #endregion
+
+    #region Test if file was already printed
+    if ($FileNameLastPrintedFile -eq $result.FileName) {
+        $result.Actions += "File '$FileNameLastPrintedFile' already printed"
+        return
+    }
     #endregion
 
     #region Download file
