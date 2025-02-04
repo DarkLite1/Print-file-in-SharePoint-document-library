@@ -260,11 +260,11 @@ Process {
             }
             $latestExcelLogFile = Get-ChildItem @params |
             Sort-Object CreationTime -Descending |
-            Select-Object -ExpandProperty 'Name' -First 1
+            Select-Object -First 1
 
             if ($latestExcelLogFile) {
                 $params = @{
-                    Path          = $latestExcelLogFile
+                    Path          = $latestExcelLogFile.FullName
                     WorksheetName = 'Overview'
                 }
                 $excelLogFileContent = Import-Excel @params |

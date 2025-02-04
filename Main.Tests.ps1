@@ -361,20 +361,43 @@ Describe 'when the script runs successfully' {
 Describe 'Option' {
     Context 'PrintDuplicate' {
         BeforeAll {
-            $testNewDate = Copy-ObjectHC $testData
-            $testNewDate.Printed = $true
-
-            Mock Invoke-PrintFileScriptHC {
-                $testNewDate
-            }
-
             $testNewInputFile = Copy-ObjectHC $testInputFile
-            $testNewInputFile.Option.PrintDuplicate = $false
+            $testNewInputFile.Option.PrintDuplicate = $true
 
             $testNewInputFile | ConvertTo-Json -Depth 7 |
             Out-File @testOutParams
 
             .$testScript @testParams
+        }
+        Context 'Invoke-PrintFileScriptHC is called' {
+            It 'the first time without a last file name printed' {
+                Should -Invoke Invoke-PrintFileScriptHC -Times 1 -Exactly -Scope Describe -ParameterFilter {
+                    ($SiteId -eq $testInputFile.SharePoint.SiteId) -and
+                    ($DriveId -eq $testInputFile.SharePoint.DriveId) -and
+                    ($FolderId -eq $testInputFile.SharePoint.FolderId) -and
+                    ($PrinterName -eq $testInputFile.Printer.Name) -and
+                    ($PrinterPort -eq $testInputFile.Printer.Port) -and
+                    (-not $FileNameLastPrintedFile)
+                }
+            }
+            It 'the second time with a last file name printed' {
+                $testNewInputFile = Copy-ObjectHC $testInputFile
+                $testNewInputFile.Option.PrintDuplicate = $false
+
+                $testNewInputFile | ConvertTo-Json -Depth 7 |
+                Out-File @testOutParams
+
+                .$testScript @testParams
+
+                Should -Invoke Invoke-PrintFileScriptHC -Times 1 -Exactly -ParameterFilter {
+                    ($SiteId -eq $testInputFile.SharePoint.SiteId) -and
+                    ($DriveId -eq $testInputFile.SharePoint.DriveId) -and
+                    ($FolderId -eq $testInputFile.SharePoint.FolderId) -and
+                    ($PrinterName -eq $testInputFile.Printer.Name) -and
+                    ($PrinterPort -eq $testInputFile.Printer.Port) -and
+                    ($FileNameLastPrintedFile -eq $testData[0].FileName)
+                }
+            }
         }
     }
 } -Tag test
