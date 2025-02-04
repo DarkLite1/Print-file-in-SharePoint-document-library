@@ -4,7 +4,7 @@
 
 BeforeAll {
     $testInputFile = @{
-        Option = @{
+        Option          = @{
             PrintDuplicate = $true
         }
         SharePoint      = @{
@@ -40,6 +40,7 @@ BeforeAll {
             PrinterPort      = $testInputFile.Printer.Port
             FileName         = 'File1.pdf'
             FileCreationDate = Get-Date
+            PrintDuplicate   = $true
             Actions          = @('file downloaded', 'file printed')
             Error            = $null
             Printed          = $true
@@ -51,6 +52,7 @@ BeforeAll {
             DateTime         = $testData[0].DateTime
             FileName         = $testData[0].FileName
             FileCreationDate = $testData[0].FileCreationDate
+            PrintDuplicate   = $testData[0].PrintDuplicate
             Printed          = $testData[0].Printed
             Actions          = $testData[0].Actions -join ', '
             Error            = $testData[0].Error
@@ -79,7 +81,8 @@ BeforeAll {
             [parameter(Mandatory)]
             [String]$PrinterName,
             [parameter(Mandatory)]
-            [Int]$PrinterPort
+            [Int]$PrinterPort,
+            [string]$FileNameLastPrintedFile
         )
     }
 
@@ -336,6 +339,7 @@ Describe 'when the script runs successfully' {
                 Should -Be $testRow.DateTime.ToString('yyyyMMdd')
                 $actualRow.FileCreationDate.ToString('yyyyMMdd') |
                 Should -Be $testRow.FileCreationDate.ToString('yyyyMMdd')
+                $actualRow.PrintDuplicate | Should -Be $testRow.PrintDuplicate
                 $actualRow.Printed | Should -Be $testRow.Printed
                 $actualRow.Actions | Should -Be $testRow.Actions
                 $actualRow.Error | Should -Be $testRow.Error
@@ -354,6 +358,26 @@ Describe 'when the script runs successfully' {
         }
     }
 }
+Describe 'Option' {
+    Context 'PrintDuplicate' {
+        BeforeAll {
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $true
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
+            }
+
+            $testNewInputFile = Copy-ObjectHC $testInputFile
+            $testNewInputFile.Option.PrintDuplicate = $false
+
+            $testNewInputFile | ConvertTo-Json -Depth 7 |
+            Out-File @testOutParams
+
+            .$testScript @testParams
+        }
+    }
+} -Tag test
 Describe 'ExportExcelFile.When' {
     Context 'create no Excel file' {
         It "'Never'" {
@@ -587,4 +611,4 @@ Describe 'SendMail.When' {
             Should -Invoke Send-MailHC @testParamFilter
         }
     }
- }
+}

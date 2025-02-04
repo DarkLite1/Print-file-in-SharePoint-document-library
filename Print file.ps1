@@ -24,6 +24,13 @@
         $driveRootChildren.id
 
         Get-MgDriveItem -DriveId $DriveId -DriveItemId $driveRootChildren.id
+
+    .PARAMETER FileNameLastPrintedFile
+        The name of the file that was printed last time.
+
+        Valid values:
+        - $null       : Print the new file
+        - 'file.txt' : Only print the latest file if its name is not 'file.txt'
 #>
 
 [CmdLetBinding()]
@@ -37,7 +44,8 @@ Param (
     [parameter(Mandatory)]
     [String]$PrinterName,
     [parameter(Mandatory)]
-    [Int]$PrinterPort
+    [Int]$PrinterPort,
+    [string]$FileNameLastPrintedFile
 )
 
 try {

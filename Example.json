@@ -12,6 +12,9 @@
     "Name": "BELPRLIXH609",
     "Port": 9100
   },
+  "Option": {
+    "PrintDuplicate": true
+  },
   "ExportExcelFile": {
     "When": "OnlyOnErrorOrAction"
   },

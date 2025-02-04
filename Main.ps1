@@ -91,7 +91,8 @@ Begin {
             [parameter(Mandatory)]
             [String]$PrinterName,
             [parameter(Mandatory)]
-            [Int]$PrinterPort
+            [Int]$PrinterPort,
+            [string]$FileNameLastPrintedFile
         )
 
         $params = @{
@@ -101,6 +102,11 @@ Begin {
             PrinterName = $PrinterName
             PrinterPort = $PrinterPort
         }
+
+        if ($FileNameLastPrintedFile) {
+            $params.FileNameLastPrintedFile = $FileNameLastPrintedFile
+        }
+
         & $scriptPathItem.PrintFile @params
     }
 
@@ -242,16 +248,47 @@ Begin {
 }
 Process {
     Try {
+        #region Get name of the last printed file
+        $fileNameLastPrintedFile = $null
+
+        if (-not $jsonFileContent.Option.PrintDuplicate) {
+            $params = @{
+                LiteralPath = $testParams.LogFolder
+                File        = $true
+                Recurse     = $true
+                Filter      = "* - Log.xlsx"
+            }
+            $latestExcelLogFile = Get-ChildItem @params |
+            Sort-Object CreationTime -Descending |
+            Select-Object -ExpandProperty 'Name' -First 1
+
+            if ($latestExcelLogFile) {
+                $params = @{
+                    Path          = $latestExcelLogFile
+                    WorksheetName = 'Overview'
+                }
+                $excelLogFileContent = Import-Excel @params |
+                Select-Object -First 1
+
+                if (-not $excelLogFileContent.Error) {
+                    $fileNameLastPrintedFile = $excelLogFileContent.FileName
+                }
+            }
+        }
+        #endregion
+
+
         #region Run Print file script
         $M = "Run Print file script"
         Write-Verbose $M; Write-EventLog @EventVerboseParams -Message $M
 
         $params = @{
-            SiteId      = $jsonFileContent.SharePoint.SiteId
-            DriveId     = $jsonFileContent.SharePoint.DriveId
-            FolderId    = $jsonFileContent.SharePoint.FolderId
-            PrinterName = $jsonFileContent.Printer.Name
-            PrinterPort = $jsonFileContent.Printer.Port
+            SiteId                  = $jsonFileContent.SharePoint.SiteId
+            DriveId                 = $jsonFileContent.SharePoint.DriveId
+            FolderId                = $jsonFileContent.SharePoint.FolderId
+            PrinterName             = $jsonFileContent.Printer.Name
+            PrinterPort             = $jsonFileContent.Printer.Port
+            FileNameLastPrintedFile = $fileNameLastPrintedFile
         }
         $results = Invoke-PrintFileScriptHC @params
         #endregion
@@ -324,7 +361,12 @@ End {
 
         #region Create Excel objects
         $exportToExcel = $results | Select-Object 'DateTime',
-        'FileName', 'FileCreationDate', 'Printed',
+        'FileName', 'FileCreationDate',
+        @{
+            Name       = 'PrintDuplicate'
+            Expression = { $jsonFileContent.Option.PrintDuplicate }
+        },
+        'Printed',
         @{
             Name       = 'Actions'
             Expression = { $_.Actions -join ', ' }
