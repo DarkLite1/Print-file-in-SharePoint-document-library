@@ -15,11 +15,7 @@
   "Option": {
     "PrintDuplicate": true
   },
-  "ExportExcelFile": {
-    "When": "OnlyOnErrorOrAction"
-  },
   "?": {
-    "SendMail.When": "Never | OnlyOnError | OnlyOnErrorOrAction | Always",
-    "ExportExcelFile.When": "Never | OnlyOnError | OnlyOnErrorOrAction"
+    "SendMail.When": "Never | OnlyOnError | OnlyOnErrorOrAction | Always"
   }
 }

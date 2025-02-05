@@ -1,4 +1,5 @@
 #Requires -Version 7
+#Requires -Modules ImportExcel
 #Requires -Modules Toolbox.EventLog, Toolbox.HTML, Toolbox.FileAndFolder
 
 <#
@@ -171,7 +172,7 @@ Begin {
 
         try {
             @(
-                'SharePoint', 'Printer', 'SendMail', 'ExportExcelFile'
+                'SharePoint', 'Printer', 'SendMail'
             ).where(
                 { -not $jsonFileContent.$_ }
             ).foreach(
@@ -219,18 +220,6 @@ Begin {
 
             if ($jsonFileContent.SendMail.When -notMatch '^Never$|^Always$|^OnlyOnError$|^OnlyOnErrorOrAction$') {
                 throw "Property 'SendMail.When' with value '$($jsonFileContent.SendMail.When)' is not valid. Accepted values are 'Always', 'Never', 'OnlyOnError' or 'OnlyOnErrorOrAction'"
-            }
-            #endregion
-
-            #region Test ExportExcelFile
-            @('When').Where(
-                { -not $jsonFileContent.ExportExcelFile.$_ }
-            ).foreach(
-                { throw "Property 'ExportExcelFile.$_' not found" }
-            )
-
-            if ($jsonFileContent.ExportExcelFile.When -notMatch '^Never$|^OnlyOnError$|^OnlyOnErrorOrAction$') {
-                throw "Property 'ExportExcelFile.When' with value '$($jsonFileContent.ExportExcelFile.When)' is not valid. Accepted values are 'Never', 'OnlyOnError' or 'OnlyOnErrorOrAction'"
             }
             #endregion
         }
@@ -379,31 +368,7 @@ End {
         $mailParams = @{}
 
         #region Create Excel file
-        $createExcelFile = $false
-
-        if (
-            ($exportToExcel) -and
-            (
-                (
-                        ($jsonFileContent.ExportExcelFile.When -eq 'OnlyOnError') -and
-                        ($counter.Errors)
-                ) -or
-                (
-                    (
-                        $jsonFileContent.ExportExcelFile.When -eq 'OnlyOnErrorOrAction'
-                    ) -and
-                    (
-                        ($counter.Errors) -or
-                        ($counter.FilesPrinted) -or
-                        ($counter.Actions)
-                    )
-                )
-            )
-        ) {
-            $createExcelFile = $true
-        }
-
-        if ($createExcelFile) {
+        if ($exportToExcel) {
             $excelParams = @{
                 Path          = "$logFile - log.xlsx"
                 TableName     = 'Overview'

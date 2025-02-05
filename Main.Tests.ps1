@@ -20,9 +20,6 @@ BeforeAll {
             To   = 'bob@contoso.com'
             When = 'Always'
         }
-        ExportExcelFile = @{
-            When = 'OnlyOnErrorOrAction'
-        }
     }
 
     $testOutParams = @{
@@ -151,7 +148,7 @@ Describe 'send an e-mail to the admin when' {
         }
         Context 'property' {
             It '<_> not found' -ForEach @(
-                'SharePoint', 'Printer', 'SendMail', 'ExportExcelFile'
+                'SharePoint', 'Printer', 'SendMail'
             ) {
                 $testNewInputFile = Copy-ObjectHC $testInputFile
                 $testNewInputFile.$_ = $null
@@ -237,42 +234,6 @@ Describe 'send an e-mail to the admin when' {
                 Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
                         (&$MailAdminParams) -and
                         ($Message -like "*$ImportFile*Property 'SendMail.$_' not found*")
-                }
-                Should -Invoke Write-EventLog -Exactly 1 -ParameterFilter {
-                    $EntryType -eq 'Error'
-                }
-            }
-            It 'ExportExcelFile.<_> not found' -ForEach @(
-                'When'
-            ) {
-                $testNewInputFile = Copy-ObjectHC $testInputFile
-                $testNewInputFile.ExportExcelFile.$_ = $null
-
-                $testNewInputFile | ConvertTo-Json -Depth 7 |
-                Out-File @testOutParams
-
-                .$testScript @testParams
-
-                Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
-                        (&$MailAdminParams) -and
-                        ($Message -like "*$ImportFile*Property 'ExportExcelFile.$_' not found*")
-                }
-                Should -Invoke Write-EventLog -Exactly 1 -ParameterFilter {
-                    $EntryType -eq 'Error'
-                }
-            }
-            It 'ExportExcelFile.When is not valid' {
-                $testNewInputFile = Copy-ObjectHC $testInputFile
-                $testNewInputFile.ExportExcelFile.When = 'wrong'
-
-                $testNewInputFile | ConvertTo-Json -Depth 7 |
-                Out-File @testOutParams
-
-                .$testScript @testParams
-
-                Should -Invoke Send-MailHC -Exactly 1 -ParameterFilter {
-                        (&$MailAdminParams) -and
-                        ($Message -like "*$ImportFile*Property 'ExportExcelFile.When' with value 'wrong' is not valid. Accepted values are 'Never', 'OnlyOnError' or 'OnlyOnErrorOrAction'*")
                 }
                 Should -Invoke Write-EventLog -Exactly 1 -ParameterFilter {
                     $EntryType -eq 'Error'
@@ -401,60 +362,12 @@ Describe 'Option' {
         }
     }
 }
-Describe 'ExportExcelFile.When' {
+Describe 'Export an Excel file' {
     Context 'create no Excel file' {
-        It "'Never'" {
-            $testNewDate = Copy-ObjectHC $testData
-            $testNewDate.Printed = $true
+        It "when no data is returned from the child script" {
+            Mock Invoke-PrintFileScriptHC
 
-            Mock Invoke-PrintFileScriptHC {
-                $testNewDate
-            }
-
-            $testNewInputFile = Copy-ObjectHC $testInputFile
-            $testNewInputFile.ExportExcelFile.When = 'Never'
-
-            $testNewInputFile | ConvertTo-Json -Depth 7 |
-            Out-File @testOutParams
-
-            .$testScript @testParams
-
-            Get-ChildItem $testParams.LogFolder -File -Recurse -Filter '*.xlsx' |
-            Should -BeNullOrEmpty
-        }
-        It "'OnlyOnError' and no errors are found" {
-            $testNewDate = Copy-ObjectHC $testData
-            $testNewDate.Printed = $true
-            $testNewDate.Error = $null
-
-            Mock Invoke-PrintFileScriptHC {
-                $testNewDate
-            }
-
-            $testNewInputFile = Copy-ObjectHC $testInputFile
-            $testNewInputFile.ExportExcelFile.When = 'OnlyOnError'
-
-            $testNewInputFile | ConvertTo-Json -Depth 7 |
-            Out-File @testOutParams
-
-            .$testScript @testParams
-
-            Get-ChildItem $testParams.LogFolder -File -Recurse -Filter '*.xlsx' |
-            Should -BeNullOrEmpty
-        }
-        It "'OnlyOnErrorOrAction' and there are no errors and no actions" {
-            $testNewDate = Copy-ObjectHC $testData
-            $testNewDate.Printed = $false
-            $testNewDate.Error = $null
-
-            Mock Invoke-PrintFileScriptHC {
-                $testNewDate
-            }
-
-            $testNewInputFile = Copy-ObjectHC $testInputFile
-            $testNewInputFile.ExportExcelFile.When = 'OnlyOnErrorOrAction'
-
-            $testNewInputFile | ConvertTo-Json -Depth 7 |
+            $testInputFile | ConvertTo-Json -Depth 7 |
             Out-File @testOutParams
 
             .$testScript @testParams
@@ -473,10 +386,7 @@ Describe 'ExportExcelFile.When' {
                 $testNewDate
             }
 
-            $testNewInputFile = Copy-ObjectHC $testInputFile
-            $testNewInputFile.ExportExcelFile.When = 'OnlyOnError'
-
-            $testNewInputFile | ConvertTo-Json -Depth 7 |
+            $testInputFile | ConvertTo-Json -Depth 7 |
             Out-File @testOutParams
 
             .$testScript @testParams
@@ -493,10 +403,7 @@ Describe 'ExportExcelFile.When' {
                 $testNewDate
             }
 
-            $testNewInputFile = Copy-ObjectHC $testInputFile
-            $testNewInputFile.ExportExcelFile.When = 'OnlyOnErrorOrAction'
-
-            $testNewInputFile | ConvertTo-Json -Depth 7 |
+            $testInputFile | ConvertTo-Json -Depth 7 |
             Out-File @testOutParams
 
             .$testScript @testParams
@@ -513,10 +420,7 @@ Describe 'ExportExcelFile.When' {
                 $testNewDate
             }
 
-            $testNewInputFile = Copy-ObjectHC $testInputFile
-            $testNewInputFile.ExportExcelFile.When = 'OnlyOnErrorOrAction'
-
-            $testNewInputFile | ConvertTo-Json -Depth 7 |
+            $testInputFile | ConvertTo-Json -Depth 7 |
             Out-File @testOutParams
 
             .$testScript @testParams
@@ -525,7 +429,7 @@ Describe 'ExportExcelFile.When' {
             Should -Not -BeNullOrEmpty
         }
     }
-}
+} -Tag test
 Describe 'SendMail.When' {
     BeforeAll {
         $testParamFilter = @{
