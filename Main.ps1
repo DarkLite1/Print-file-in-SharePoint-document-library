@@ -362,6 +362,7 @@ End {
             Name       = 'Actions'
             Expression = { $_.Actions -join ', ' }
         },
+        'Info',
         'Error'
         #endregion
 

@@ -429,7 +429,7 @@ Describe 'Export an Excel file' {
             Should -Not -BeNullOrEmpty
         }
     }
-} -Tag test
+}
 Describe 'SendMail.When' {
     BeforeAll {
         $testParamFilter = @{
@@ -438,6 +438,15 @@ Describe 'SendMail.When' {
     }
     Context 'send no e-mail to the user' {
         It "'Never'" {
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $false
+            $testNewDate.Error ='oops'
+            $testNewDate.Actions = @('a')
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
+            }
+
             $testNewInputFile = Copy-ObjectHC $testInputFile
             $testNewInputFile.SendMail.When = 'Never'
 
@@ -449,6 +458,15 @@ Describe 'SendMail.When' {
             Should -Not -Invoke Send-MailHC @testParamFilter
         }
         It "'OnlyOnError' and no errors are found" {
+            $testNewDate = Copy-ObjectHC $testData
+            $testNewDate.Printed = $false
+            $testNewDate.Error = $null
+            $testNewDate.Actions = @('a')
+
+            Mock Invoke-PrintFileScriptHC {
+                $testNewDate
+            }
+
             $testNewInputFile = Copy-ObjectHC $testInputFile
             $testNewInputFile.SendMail.When = 'OnlyOnError'
 
@@ -463,6 +481,7 @@ Describe 'SendMail.When' {
             $testNewDate = Copy-ObjectHC $testData
             $testNewDate.Printed = $false
             $testNewDate.Error = $null
+            $testNewDate.Actions = @()
 
             Mock Invoke-PrintFileScriptHC {
                 $testNewDate
@@ -502,6 +521,7 @@ Describe 'SendMail.When' {
         It "'OnlyOnErrorOrAction' and there are actions but no errors" {
             $testNewDate = Copy-ObjectHC $testData
             $testNewDate.Printed = $true
+            $testNewDate.Actions = @('a')
             $testNewDate.Error = $null
 
             Mock Invoke-PrintFileScriptHC {
@@ -521,6 +541,7 @@ Describe 'SendMail.When' {
         It "'OnlyOnErrorOrAction' and there are errors but no actions" {
             $testNewDate = Copy-ObjectHC $testData
             $testNewDate.Printed = $false
+            $testNewDate.Actions = @()
             $testNewDate.Error = 'oops'
 
             Mock Invoke-PrintFileScriptHC {
@@ -538,4 +559,4 @@ Describe 'SendMail.When' {
             Should -Invoke Send-MailHC @testParamFilter
         }
     }
-}
+} -Tag test

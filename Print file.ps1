@@ -61,6 +61,7 @@ try {
         FileName         = $null
         FileCreationDate = $null
         Actions          = @()
+        Info             = @()
         Error            = $null
         Printed          = $false
     }
@@ -149,7 +150,7 @@ try {
     #region Test if file was already printed
     if ($FileNameLastPrintedFile -eq $result.FileName) {
         Write-Verbose 'File already printed'
-        $result.Actions += "File '$FileNameLastPrintedFile' already printed"
+        $result.Info += "File '$FileNameLastPrintedFile' already printed"
         return
     }
     #endregion
