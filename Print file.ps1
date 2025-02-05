@@ -148,6 +148,7 @@ try {
 
     #region Test if file was already printed
     if ($FileNameLastPrintedFile -eq $result.FileName) {
+        Write-Verbose 'File already printed'
         $result.Actions += "File '$FileNameLastPrintedFile' already printed"
         return
     }

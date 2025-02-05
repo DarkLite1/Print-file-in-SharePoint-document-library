@@ -253,7 +253,7 @@ Process {
 
         if (-not $jsonFileContent.Option.PrintDuplicate) {
             $params = @{
-                LiteralPath = $testParams.LogFolder
+                LiteralPath = $logParams.LogFolder
                 File        = $true
                 Recurse     = $true
                 Filter      = "* - Log.xlsx"
@@ -308,6 +308,8 @@ End {
                 $results | Where-Object { $_.Printed } | Measure-Object).Count
             Errors       = (
                 $results | Where-Object { $_.Error } | Measure-Object).Count
+            Actions       = (
+                $results | Where-Object { $_.Actions } | Measure-Object).Count
         }
         #endregion
 
@@ -391,7 +393,9 @@ End {
                         $jsonFileContent.ExportExcelFile.When -eq 'OnlyOnErrorOrAction'
                     ) -and
                     (
-                        ($counter.Errors) -or ($counter.FilesPrinted)
+                        ($counter.Errors) -or
+                        ($counter.FilesPrinted) -or
+                        ($counter.Actions)
                     )
                 )
             )
@@ -448,7 +452,11 @@ End {
             ) -or
             (
                 ($jsonFileContent.SendMail.When -eq 'OnlyOnErrorOrAction') -and
-                (($counter.Errors) -or ($counter.FilesPrinted))
+                (
+                    ($counter.Errors) -or
+                    ($counter.FilesPrinted) -or
+                    ($counter.Actions)
+                )
             )
         ) {
             $sendMailToUser = $true
